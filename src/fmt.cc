@@ -1,144 +1,134 @@
 #include "fmt.h"
-#include "usart.h"
 
 
-namespace {
-    void print_decimal(OutStream& out_stream, uint32_t val) {
-        if (val == 0) {
-            out_stream.send_char('0');
-            return;
-        }
-
-        char buf[17];  // ?
-        std::int8_t i = 0;
-
-        for (; val > 0; val = val/10) {
-            buf[i++] = val%10 + '0';
-        }
-
-        --i;
-        while (i >= 0) {
-            out_stream.send_char(buf[i--]);
-        }
+void Printer::number_to_string(char* buf, uint32_t val) {
+    if (val == 0) {
+        buf[0] = '0';
+        buf[1] = '\0';
+        return;
     }
 
-    void print_hex(OutStream& out_stream, uint32_t val) {
-        char buf[17];  // TODO
-        std::int8_t i = 0;
+    uint32_t x = 1, n_digits = 0;
 
-        for (; val > 0; val = val / 16) {
-            uint8_t const digit = val % 16;
-
-            if (digit < 10) {
-                buf[i++] = digit + '0';
-            } else {
-                buf[i++] = digit + 'a' - 10;
-            }
-        }
-
-        --i;
-        while (i >= 0) {
-            out_stream.send_char(buf[i--]);
-
-            if (i == 3) {
-                out_stream.send_char(' ');
-            }
-        }
+    if (base == 0) {
+        base = 10;
     }
 
-    inline void print_number(OutStream& out_stream, uint32_t val, char fmt_flag, char default_fmt = 'd') {
-        char fmt = fmt_flag == 0 ? default_fmt : fmt_flag;
+    while (x <= val) {
+        x *= base;
+        n_digits += 1;
+    }
 
-        if (fmt == 'd') {
-            print_decimal(out_stream, val);
-        } else if (fmt == 'x') {
-            print_hex(out_stream, val);
+    for (std::uint8_t i = 0; val > 0; ++i) {
+        uint8_t const digit = val % base;
+
+        if (digit < 10) {
+            buf[n_digits - i - 1] = digit + '0';
         } else {
-            out_stream.send_char('?'); out_stream.send_char('f'); out_stream.send_char('?');
+            buf[n_digits - i - 1] = digit + 'a' - 10;  // TODO lower/upper case
         }
+
+        val = val / base;
     }
+
+    buf[n_digits] = '\0';
 }
 
 
-void Arg::print(OutStream& out_stream, char fmt_flag) const {
-    if (type == SIGNED) {
-        std::uint32_t val;
+void Printer::print_arg(Arg const& arg) {
+    if (arg.type == Arg::CHAR) {
+        out_stream.send_char(arg.u.char_value);
+        return;
+    }
 
-        if (u.signed_value < 0) {
-            out_stream.send_char('-');
-            val = -u.signed_value;
-        } else {
-            val = +u.signed_value;
-        }
+    char buf[12];
+    char* str_val;
 
-        print_number(out_stream, val, fmt_flag);
-
-    } else if (type == UNSIGNED) {
-        print_number(out_stream, u.unsigned_value, fmt_flag);
-
-    } else if (type == CHAR) {
-        out_stream.send_char(u.char_value);
-
-    } else if (type == CHARP) {
-        for (auto i = u.charp_value; *i != 0; ++i) {
-            out_stream.send_char(*i);
-        }
-
-    } else if (type == POINTER) {
-        print_number(out_stream, u.pointer_value, fmt_flag, 'x');  // TODO passing size_t into a uint32_t
-
+    if (arg.type == Arg::CHARP) {
+        str_val = arg.u.charp_value;
     } else {
-        out_stream.send_char('?');
+        std::uint32_t num_val;
+
+        if (arg.type == Arg::SIGNED) {
+            if (arg.u.signed_value < 0) {
+                out_stream.send_char('-');
+                num_val = -arg.u.signed_value;
+            } else {
+                num_val = +arg.u.signed_value;
+            }
+        } else if (arg.type == Arg::UNSIGNED) {
+            num_val = arg.u.unsigned_value;
+        } else if (arg.type == Arg::POINTER) {
+            if (base == 0) {
+                base = 16;
+            }
+            num_val = arg.u.pointer_value;  // TODO passing size_t into a uint32_t
+        }
+
+        number_to_string(buf, num_val);
+        str_val = buf;
+    }
+
+    for (auto i = str_val; *i != 0; ++i) {
+        out_stream.send_char(*i);
     }
 }
 
 
-void do_safe_printf(OutStream& out_stream, const char *format, const Arg *args, std::size_t num_args) {
+void Printer::operator()(char const* format, Arg const* args, std::size_t num_args)
+{
     auto i = format;
     std::size_t current_arg = 0;
 
     while (*i != 0) {
-        if (*i == '{') {
+        if (*i != '%') {
+            out_stream.send_char(*i++);
+            continue;
+        }
+
+        base = 0;  // default base depending on arg type
+        print_base = false;
+        width = 0;
+        fill_char = ' ';
+        left_justify = false;
+
+        while (true) {
             ++i;
 
-            std::size_t arg_n = 0;
-            bool has_arg_n = false;
-            char fmt_flag = 0;
-
-            while (*i >= '0' && *i <= '9') {
-                has_arg_n = true;
-                arg_n = 10 * arg_n + *i - '0';
-                ++i;
-            }
-
-            if (*i == ':') {  // format syntax: {:x} or {3:x}
-                ++i;
-
-                if ((*i >= 'A' && *i <= 'Z') || (*i >= 'a' && *i <= 'z')) {
-                    fmt_flag = *i;
-                    ++i;
-                }
-            }
-
-            if (*i == '}') {
-                ++i;
+            if (*i == '#') {
+                print_base = true;
+            } else if (*i == '0') {
+                fill_char ='0';
+            } else if (*i == ' ') {
+                fill_char =' ';
+            } else if (*i == '-') {
+                left_justify = true;
             } else {
-                out_stream.send_char('?'); out_stream.send_char('}'); out_stream.send_char('?');
-                return;
+                break;
             }
+        }
 
-            if (!has_arg_n) {
-                arg_n = current_arg++;
-            }
+        while (*i >= '0' && *i <= '9') {
+            width = 10 * width + *i - '0';
+            ++i;
+        }
 
-            if (arg_n >= num_args) {
-                out_stream.send_char('?'); out_stream.send_char('N'); out_stream.send_char('?');
-                return;
-            }
-
-            args[arg_n].print(out_stream, fmt_flag);
+        if (*i == 's') {
+            // TODO
+        } else if (*i == 'd' || *i == 'i') {
+            base = 10;
+        } else if (*i == 'x') {
+            base = 16;
         } else {
-            out_stream.send_char(*i++);
+            // ERROR
+        }
+
+        ++i;
+
+        if (current_arg >= num_args) {
+            // ERROR
+        } else {
+            print_arg(args[current_arg++]);
         }
     }
 

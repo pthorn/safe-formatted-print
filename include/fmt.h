@@ -10,7 +10,18 @@
 #include <cstdint>
 
 
+class OutStream {
+public:
+    virtual void send_char(char c) = 0;
+    virtual void complete() = 0;
+
+    virtual ~OutStream() { }
+};
+
+
 class Arg {
+    friend class Printer;
+
 public:
     Arg(int value)
     : type(SIGNED) {
@@ -58,8 +69,6 @@ public:
 //        u.double_value = value;
 //    }
 
-    void print(OutStream& out_stream, char fmt_flag) const;
-
 private:
   enum Type {
       SIGNED, UNSIGNED, CHAR, CHARP, POINTER //,DOUBLE
@@ -78,12 +87,43 @@ private:
 };
 
 
-void do_safe_printf(OutStream& out_stream, const char *format, const Arg *args, std::size_t num_args);
+class Printer {
+public:
+    Printer(OutStream& out_stream):
+        out_stream(out_stream) { }
+
+    void operator()(char const* format, Arg const* args, std::size_t num_args);
+
+private:
+    void print_arg(const Arg &arg);
+    void print_number(uint32_t val);
+    void number_to_string(char *buf, uint32_t val);
+
+    OutStream& out_stream;
+    uint8_t base;
+    uint8_t print_base;  // boolean
+    uint8_t width;
+    char fill_char;
+    uint8_t left_justify;  // boolean
+};
+
+
+template <typename... Args>
+void fmt_print(Printer const& printer, const char *format, const Args&... args) {
+    Arg const arg_array[] = {args...};
+    std::size_t const num_args = sizeof...(Args);
+
+    printer(format, arg_array, num_args);
+}
+
 
 template <typename... Args>
 void fmt_print(OutStream& out_stream, const char *format, const Args&... args) {
-    Arg arg_array[] = {args...};
-    do_safe_printf(out_stream, format, arg_array, sizeof...(Args));
+    Arg const arg_array[] = {args...};
+    std::size_t const num_args = sizeof...(Args);
+
+    Printer printer(out_stream);
+    printer(format, arg_array, num_args);
 }
 
 #endif // FMT_H
