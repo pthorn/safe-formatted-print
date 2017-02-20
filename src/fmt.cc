@@ -1,3 +1,5 @@
+#include <cstring>
+
 #include "fmt.h"
 
 
@@ -50,12 +52,8 @@ void Printer::print_arg(Arg const& arg) {
         std::uint32_t num_val;
 
         if (arg.type == Arg::SIGNED) {
-            if (arg.u.signed_value < 0) {
-                out_stream.send_char('-');
-                num_val = -arg.u.signed_value;
-            } else {
-                num_val = +arg.u.signed_value;
-            }
+            num_val = (arg.u.signed_value < 0) ?
+                -arg.u.signed_value : +arg.u.signed_value;
         } else if (arg.type == Arg::UNSIGNED) {
             num_val = arg.u.unsigned_value;
         } else if (arg.type == Arg::POINTER) {
@@ -67,6 +65,27 @@ void Printer::print_arg(Arg const& arg) {
 
         number_to_string(buf, num_val);
         str_val = buf;
+
+        if (arg.type == Arg::SIGNED && arg.u.signed_value < 0) {
+            out_stream.send_char('-');
+        }
+
+        if (print_base) {
+            if (base == 16) {
+                out_stream.send_char('0');
+                out_stream.send_char(uppercase ? 'X' : 'x');
+            }
+        }
+    }
+
+    if (fill_char != '\0') {
+        uint32_t buf_width = std::strlen(buf);
+
+        if (width > buf_width) {
+            for (uint32_t i = 0; i < width - buf_width; ++i) {
+                out_stream.send_char(fill_char);
+            }
+        }
     }
 
     for (auto i = str_val; *i != 0; ++i) {
@@ -89,7 +108,7 @@ void Printer::operator()(char const* format, Arg const* args, std::size_t num_ar
         base = 0;  // default base depending on arg type
         print_base = false;
         width = 0;
-        fill_char = ' ';
+        fill_char = '\0';
         left_justify = false;
 
         while (true) {
