@@ -101,6 +101,7 @@ private:
 
     OutStream& out_stream;
     uint8_t base;
+    uint8_t uppercase;  // boolean
     uint8_t print_base;  // boolean
     uint8_t width;
     char fill_char;

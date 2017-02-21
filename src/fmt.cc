@@ -27,7 +27,7 @@ void Printer::number_to_string(char* buf, uint32_t val) {
         if (digit < 10) {
             buf[n_digits - i - 1] = digit + '0';
         } else {
-            buf[n_digits - i - 1] = digit + 'a' - 10;  // TODO lower/upper case
+            buf[n_digits - i - 1] = digit + (uppercase ? 'A' : 'a') - 10;
         }
 
         val = val / base;
@@ -113,6 +113,7 @@ void Printer::operator()(char const* format, Arg const* args, std::size_t num_ar
         }
 
         base = 0;  // 0 means 16 for pointers, 10 for everything else
+        uppercase = false;
         print_base = false;
         width = 0;
         fill_char = '\0';
@@ -145,6 +146,9 @@ void Printer::operator()(char const* format, Arg const* args, std::size_t num_ar
             base = 10;
         } else if (*i == 'x') {
             base = 16;
+        } else if (*i == 'X') {
+            base = 16;
+            uppercase = true;
         } else {
             // ERROR
         }
