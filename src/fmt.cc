@@ -105,15 +105,20 @@ void Printer::operator()(char const* format, Arg const* args, std::size_t num_ar
             continue;
         }
 
-        base = 0;  // default base depending on arg type
+        ++i;
+
+        if (*i == '%') {
+            out_stream.send_char(*i++);
+            continue;
+        }
+
+        base = 0;  // 0 means 16 for pointers, 10 for everything else
         print_base = false;
         width = 0;
         fill_char = '\0';
         left_justify = false;
 
         while (true) {
-            ++i;
-
             if (*i == '#') {
                 print_base = true;
             } else if (*i == '0') {
@@ -125,6 +130,8 @@ void Printer::operator()(char const* format, Arg const* args, std::size_t num_ar
             } else {
                 break;
             }
+
+            ++i;
         }
 
         while (*i >= '0' && *i <= '9') {
