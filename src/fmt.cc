@@ -10,11 +10,12 @@ void Printer::number_to_string(char* buf, uint32_t val) {
         return;
     }
 
-    uint32_t x = 1, n_digits = 0;
-
     if (base == 0) {
         base = 10;
     }
+
+    uint64_t x = 1;
+    uint32_t n_digits = 0;
 
     while (x <= val) {
         x *= base;
