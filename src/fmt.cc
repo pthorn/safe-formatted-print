@@ -1,4 +1,7 @@
 #include <cstring>
+#if FMT_USE_QT
+#include <QString>
+#endif
 
 #include "fmt.h"
 
@@ -49,6 +52,10 @@ void Printer::print_arg(Arg const& arg) {
 
     if (arg.type == Arg::CHARP) {
         str_val = arg.u.charp_value;
+#if FMT_USE_QT
+    } else if (arg.type == Arg::QSTRING) {
+        str_val = arg.u.qstring_value->toLatin1().data();
+#endif
     } else {
         std::uint32_t num_val;
 

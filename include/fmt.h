@@ -58,6 +58,13 @@ public:
         u.charp_value = const_cast<char*>(value);
     }
 
+#if FMT_USE_QT
+    Arg(QString const& value)
+    : type(QSTRING) {
+        u.qstring_value = &value;
+    }
+#endif
+
     Arg(const void *value)
     : type(POINTER) {
         u.pointer_value = reinterpret_cast<std::size_t>(value);
@@ -69,9 +76,13 @@ public:
 //        u.double_value = value;
 //    }
 
-private:
+//private:
   enum Type {
-      SIGNED, UNSIGNED, CHAR, CHARP, POINTER //,DOUBLE
+      SIGNED, UNSIGNED, CHAR, CHARP, POINTER
+#if FMT_USE_QT
+      , QSTRING
+#endif
+      //,DOUBLE
   };
 
   Type type;
@@ -82,6 +93,9 @@ private:
     char char_value;
     char *charp_value;
     size_t pointer_value;
+#if FMT_USE_QT
+    QString const* qstring_value;
+#endif
     //double double_value;
   } u;
 };
