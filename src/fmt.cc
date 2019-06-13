@@ -158,12 +158,14 @@ void Printer::operator()(char const* format, Arg const* args, std::size_t num_ar
             base = 16;
             uppercase = true;
         } else {
+            while (true) ;;
             // ERROR
         }
 
         ++i;
 
         if (current_arg >= num_args) {
+            while (true) ;;
             // ERROR
         } else {
             print_arg(args[current_arg++]);
