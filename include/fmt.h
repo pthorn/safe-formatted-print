@@ -14,8 +14,6 @@ class OutStream {
 public:
     virtual void send_char(char c) = 0;
     virtual void complete() = 0;
-
-    virtual ~OutStream() { }
 };
 
 
